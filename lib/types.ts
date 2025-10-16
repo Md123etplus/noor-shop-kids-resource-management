@@ -21,3 +21,16 @@ export interface Profile {
   full_name: string | null
   created_at: string
 }
+
+export interface Resource {
+  id: string
+  resource_id: string | null
+  nom: string | null
+  prenom: string | null
+  telephone: string | null
+  produit: string | null
+  commentaire: string | null
+  created_at: string
+  updated_at: string
+  user_id: string
+}

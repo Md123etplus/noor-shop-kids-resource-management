@@ -4,13 +4,18 @@ import { redirect } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard-nav"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
+    if (!user) {
+      redirect("/login")
+    }
+  } catch (error) {
+    console.error("[v0] Dashboard layout auth error:", error)
     redirect("/login")
   }
 

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { LayoutDashboard, Users, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, LogOut, Package } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const navItems = [
@@ -17,6 +17,11 @@ const navItems = [
     title: "Clients",
     href: "/dashboard/customers",
     icon: Users,
+  },
+  {
+    title: "Ressources",
+    href: "/dashboard/resources",
+    icon: Package,
   },
 ]
 

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import type { Customer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,9 +16,18 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { Plus, Search, Pencil, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+
+const STATUS_OPTIONS = [
+  { value: "nouveau", label: "Nouveau" },
+  { value: "actif", label: "Actif" },
+  { value: "inactif", label: "Inactif" },
+  { value: "vip", label: "VIP" },
+  { value: "en_attente", label: "En attente" },
+]
 
 interface CustomersTableProps {
   initialCustomers: Customer[]
@@ -43,6 +52,25 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   })
   const router = useRouter()
 
+  const generateNextClientId = () => {
+    if (customers.length === 0) {
+      return "CLT-001"
+    }
+
+    // Find the highest client ID number
+    const clientIds = customers
+      .map((c) => c.client_id)
+      .filter((id) => id && id.startsWith("CLT-"))
+      .map((id) => {
+        const num = Number.parseInt(id.split("-")[1])
+        return isNaN(num) ? 0 : num
+      })
+
+    const maxId = Math.max(0, ...clientIds)
+    const nextId = maxId + 1
+    return `CLT-${String(nextId).padStart(3, "0")}`
+  }
+
   const filteredCustomers = useMemo(() => {
     return customers.filter(
       (customer) =>
@@ -58,9 +86,14 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value })
+  }
+
   const resetForm = () => {
+    const nextClientId = generateNextClientId()
     setFormData({
-      client_id: "",
+      client_id: nextClientId,
       nom: "",
       prenom: "",
       telephone: "",
@@ -73,6 +106,13 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     })
     setEditingCustomer(null)
   }
+
+  useEffect(() => {
+    if (isAddDialogOpen && !editingCustomer) {
+      const nextClientId = generateNextClientId()
+      setFormData((prev) => ({ ...prev, client_id: nextClientId }))
+    }
+  }, [isAddDialogOpen, editingCustomer])
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -186,8 +226,14 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="client_id">ID Client</Label>
-                  <Input id="client_id" name="client_id" value={formData.client_id} onChange={handleInputChange} />
+                  <Label htmlFor="client_id">ID Client (modifiable)</Label>
+                  <Input
+                    id="client_id"
+                    name="client_id"
+                    value={formData.client_id}
+                    onChange={handleInputChange}
+                    placeholder="CLT-001"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom</Label>
@@ -217,12 +263,21 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="statut_client">Statut du client</Label>
-                  <Input
-                    id="statut_client"
-                    name="statut_client"
+                  <Select
                     value={formData.statut_client}
-                    onChange={handleInputChange}
-                  />
+                    onValueChange={(value) => handleSelectChange("statut_client", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="adresse">Adresse</Label>
@@ -291,7 +346,12 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                   <TableCell>{customer.adresse || "-"}</TableCell>
                   <TableCell>{customer.produit_achete || "-"}</TableCell>
                   <TableCell>{customer.date_achat || "-"}</TableCell>
-                  <TableCell>{customer.statut_client || "-"}</TableCell>
+                  <TableCell>
+                    {customer.statut_client
+                      ? STATUS_OPTIONS.find((opt) => opt.value === customer.statut_client)?.label ||
+                        customer.statut_client
+                      : "-"}
+                  </TableCell>
                   <TableCell className="max-w-[200px] truncate">{customer.commentaire || "-"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -312,7 +372,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                           <form onSubmit={handleUpdateCustomer} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor="edit_client_id">ID Client</Label>
+                                <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
                                 <Input
                                   id="edit_client_id"
                                   name="client_id"
@@ -364,12 +424,21 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="edit_statut_client">Statut du client</Label>
-                                <Input
-                                  id="edit_statut_client"
-                                  name="statut_client"
+                                <Select
                                   value={formData.statut_client}
-                                  onChange={handleInputChange}
-                                />
+                                  onValueChange={(value) => handleSelectChange("statut_client", value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Sélectionner un statut" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {STATUS_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="edit_adresse">Adresse</Label>
