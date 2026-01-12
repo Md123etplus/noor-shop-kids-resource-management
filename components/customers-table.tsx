@@ -201,8 +201,8 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher un client..."
@@ -213,7 +213,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
+            <Button onClick={() => resetForm()} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Ajouter un client
             </Button>
@@ -312,179 +312,372 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       </div>
 
       <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID Client</TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Prénom</TableHead>
-              <TableHead>Téléphone</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Adresse</TableHead>
-              <TableHead>Produit acheté</TableHead>
-              <TableHead>Date d'achat</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead>Commentaire</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCustomers.length === 0 ? (
+        {/* Desktop table view */}
+        <div className="hidden lg:block overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                  Aucun client trouvé
-                </TableCell>
+                <TableHead>ID Client</TableHead>
+                <TableHead>Nom</TableHead>
+                <TableHead>Prénom</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Adresse</TableHead>
+                <TableHead>Produit acheté</TableHead>
+                <TableHead>Date d'achat</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Commentaire</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.client_id || "-"}</TableCell>
-                  <TableCell>{customer.nom || "-"}</TableCell>
-                  <TableCell>{customer.prenom || "-"}</TableCell>
-                  <TableCell>{customer.telephone || "-"}</TableCell>
-                  <TableCell>{customer.email || "-"}</TableCell>
-                  <TableCell>{customer.adresse || "-"}</TableCell>
-                  <TableCell>{customer.produit_achete || "-"}</TableCell>
-                  <TableCell>{customer.date_achat || "-"}</TableCell>
-                  <TableCell>
-                    {customer.statut_client
-                      ? STATUS_OPTIONS.find((opt) => opt.value === customer.statut_client)?.label ||
-                        customer.statut_client
-                      : "-"}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">{customer.commentaire || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Dialog
-                        open={editingCustomer?.id === customer.id}
-                        onOpenChange={(open) => !open && setEditingCustomer(null)}
-                      >
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(customer)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Modifier le client</DialogTitle>
-                            <DialogDescription>Modifiez les informations du client</DialogDescription>
-                          </DialogHeader>
-                          <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
-                                <Input
-                                  id="edit_client_id"
-                                  name="client_id"
-                                  value={formData.client_id}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_nom">Nom</Label>
-                                <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_prenom">Prénom</Label>
-                                <Input
-                                  id="edit_prenom"
-                                  name="prenom"
-                                  value={formData.prenom}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_telephone">Téléphone</Label>
-                                <Input
-                                  id="edit_telephone"
-                                  name="telephone"
-                                  value={formData.telephone}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_email">Email</Label>
-                                <Input
-                                  id="edit_email"
-                                  name="email"
-                                  type="email"
-                                  value={formData.email}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_date_achat">Date d'achat</Label>
-                                <Input
-                                  id="edit_date_achat"
-                                  name="date_achat"
-                                  type="date"
-                                  value={formData.date_achat}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_statut_client">Statut du client</Label>
-                                <Select
-                                  value={formData.statut_client}
-                                  onValueChange={(value) => handleSelectChange("statut_client", value)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner un statut" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {STATUS_OPTIONS.map((option) => (
-                                      <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_adresse">Adresse</Label>
-                                <Input
-                                  id="edit_adresse"
-                                  name="adresse"
-                                  value={formData.adresse}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_produit_achete">Produit acheté</Label>
-                              <Input
-                                id="edit_produit_achete"
-                                name="produit_achete"
-                                value={formData.produit_achete}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_commentaire">Commentaire</Label>
-                              <Textarea
-                                id="edit_commentaire"
-                                name="commentaire"
-                                value={formData.commentaire}
-                                onChange={handleInputChange}
-                                rows={3}
-                              />
-                            </div>
-                            <Button type="submit" className="w-full">
-                              Mettre à jour
-                            </Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filteredCustomers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                    Aucun client trouvé
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.client_id || "-"}</TableCell>
+                    <TableCell>{customer.nom || "-"}</TableCell>
+                    <TableCell>{customer.prenom || "-"}</TableCell>
+                    <TableCell>{customer.telephone || "-"}</TableCell>
+                    <TableCell>{customer.email || "-"}</TableCell>
+                    <TableCell>{customer.adresse || "-"}</TableCell>
+                    <TableCell>{customer.produit_achete || "-"}</TableCell>
+                    <TableCell>{customer.date_achat || "-"}</TableCell>
+                    <TableCell>
+                      {customer.statut_client
+                        ? STATUS_OPTIONS.find((opt) => opt.value === customer.statut_client)?.label ||
+                          customer.statut_client
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">{customer.commentaire || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Dialog
+                          open={editingCustomer?.id === customer.id}
+                          onOpenChange={(open) => !open && setEditingCustomer(null)}
+                        >
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(customer)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Modifier le client</DialogTitle>
+                              <DialogDescription>Modifiez les informations du client</DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleUpdateCustomer} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
+                                  <Input
+                                    id="edit_client_id"
+                                    name="client_id"
+                                    value={formData.client_id}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_nom">Nom</Label>
+                                  <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_prenom">Prénom</Label>
+                                  <Input
+                                    id="edit_prenom"
+                                    name="prenom"
+                                    value={formData.prenom}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_telephone">Téléphone</Label>
+                                  <Input
+                                    id="edit_telephone"
+                                    name="telephone"
+                                    value={formData.telephone}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_email">Email</Label>
+                                  <Input
+                                    id="edit_email"
+                                    name="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_date_achat">Date d'achat</Label>
+                                  <Input
+                                    id="edit_date_achat"
+                                    name="date_achat"
+                                    type="date"
+                                    value={formData.date_achat}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_statut_client">Statut du client</Label>
+                                  <Select
+                                    value={formData.statut_client}
+                                    onValueChange={(value) => handleSelectChange("statut_client", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Sélectionner un statut" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {STATUS_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_adresse">Adresse</Label>
+                                  <Input
+                                    id="edit_adresse"
+                                    name="adresse"
+                                    value={formData.adresse}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit_produit_achete">Produit acheté</Label>
+                                <Input
+                                  id="edit_produit_achete"
+                                  name="produit_achete"
+                                  value={formData.produit_achete}
+                                  onChange={handleInputChange}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit_commentaire">Commentaire</Label>
+                                <Textarea
+                                  id="edit_commentaire"
+                                  name="commentaire"
+                                  value={formData.commentaire}
+                                  onChange={handleInputChange}
+                                  rows={3}
+                                />
+                              </div>
+                              <Button type="submit" className="w-full">
+                                Mettre à jour
+                              </Button>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile card view */}
+        <div className="lg:hidden divide-y">
+          {filteredCustomers.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">Aucun client trouvé</div>
+          ) : (
+            filteredCustomers.map((customer) => (
+              <div key={customer.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate">
+                      {customer.prenom} {customer.nom}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{customer.client_id || "-"}</div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Dialog
+                      open={editingCustomer?.id === customer.id}
+                      onOpenChange={(open) => !open && setEditingCustomer(null)}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(customer)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Modifier le client</DialogTitle>
+                          <DialogDescription>Modifiez les informations du client</DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleUpdateCustomer} className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
+                              <Input
+                                id="edit_client_id"
+                                name="client_id"
+                                value={formData.client_id}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_nom">Nom</Label>
+                              <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_prenom">Prénom</Label>
+                              <Input
+                                id="edit_prenom"
+                                name="prenom"
+                                value={formData.prenom}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_telephone">Téléphone</Label>
+                              <Input
+                                id="edit_telephone"
+                                name="telephone"
+                                value={formData.telephone}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_email">Email</Label>
+                              <Input
+                                id="edit_email"
+                                name="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_date_achat">Date d'achat</Label>
+                              <Input
+                                id="edit_date_achat"
+                                name="date_achat"
+                                type="date"
+                                value={formData.date_achat}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_statut_client">Statut du client</Label>
+                              <Select
+                                value={formData.statut_client}
+                                onValueChange={(value) => handleSelectChange("statut_client", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner un statut" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit_adresse">Adresse</Label>
+                              <Input
+                                id="edit_adresse"
+                                name="adresse"
+                                value={formData.adresse}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_produit_achete">Produit acheté</Label>
+                            <Input
+                              id="edit_produit_achete"
+                              name="produit_achete"
+                              value={formData.produit_achete}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_commentaire">Commentaire</Label>
+                            <Textarea
+                              id="edit_commentaire"
+                              name="commentaire"
+                              value={formData.commentaire}
+                              onChange={handleInputChange}
+                              rows={3}
+                            />
+                          </div>
+                          <Button type="submit" className="w-full">
+                            Mettre à jour
+                          </Button>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDeleteCustomer(customer.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Téléphone</div>
+                    <div className="truncate">{customer.telephone || "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Email</div>
+                    <div className="truncate">{customer.email || "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Produit</div>
+                    <div className="truncate">{customer.produit_achete || "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Statut</div>
+                    <div className="truncate">
+                      {customer.statut_client
+                        ? STATUS_OPTIONS.find((opt) => opt.value === customer.statut_client)?.label ||
+                          customer.statut_client
+                        : "-"}
+                    </div>
+                  </div>
+                </div>
+                {customer.adresse && (
+                  <div className="text-sm">
+                    <div className="text-xs text-muted-foreground">Adresse</div>
+                    <div className="truncate">{customer.adresse}</div>
+                  </div>
+                )}
+                {customer.commentaire && (
+                  <div className="text-sm">
+                    <div className="text-xs text-muted-foreground">Commentaire</div>
+                    <div className="line-clamp-2 text-xs">{customer.commentaire}</div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

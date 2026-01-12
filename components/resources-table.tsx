@@ -221,8 +221,8 @@ export function ResourcesTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher une ressource..."
@@ -233,7 +233,7 @@ export function ResourcesTable() {
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openAddDialog}>
+            <Button onClick={openAddDialog} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Ajouter une ressource
             </Button>
@@ -317,49 +317,96 @@ export function ResourcesTable() {
       </div>
 
       <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Référence</TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Prénom</TableHead>
-              <TableHead>Téléphone</TableHead>
-              <TableHead>Produit</TableHead>
-              <TableHead>Commentaire</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredResources.length === 0 ? (
+        {/* Desktop table view */}
+        <div className="hidden lg:block">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  Aucune ressource trouvée
-                </TableCell>
+                <TableHead>Référence</TableHead>
+                <TableHead>Nom</TableHead>
+                <TableHead>Prénom</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>Produit</TableHead>
+                <TableHead>Commentaire</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredResources.map((resource) => (
-                <TableRow key={resource.id}>
-                  <TableCell className="font-medium">{resource.resource_id}</TableCell>
-                  <TableCell>{resource.nom}</TableCell>
-                  <TableCell>{resource.prenom}</TableCell>
-                  <TableCell>{resource.telephone}</TableCell>
-                  <TableCell>{resource.produit}</TableCell>
-                  <TableCell className="max-w-xs truncate">{resource.commentaire}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(resource)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(resource.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filteredResources.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    Aucune ressource trouvée
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredResources.map((resource) => (
+                  <TableRow key={resource.id}>
+                    <TableCell className="font-medium">{resource.resource_id}</TableCell>
+                    <TableCell>{resource.nom}</TableCell>
+                    <TableCell>{resource.prenom}</TableCell>
+                    <TableCell>{resource.telephone}</TableCell>
+                    <TableCell>{resource.produit}</TableCell>
+                    <TableCell className="max-w-xs truncate">{resource.commentaire}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(resource)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(resource.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile card view */}
+        <div className="lg:hidden divide-y">
+          {filteredResources.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">Aucune ressource trouvée</div>
+          ) : (
+            filteredResources.map((resource) => (
+              <div key={resource.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate">
+                      {resource.prenom} {resource.nom}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{resource.resource_id}</div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(resource)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(resource.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Téléphone</div>
+                    <div className="truncate">{resource.telephone}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Produit</div>
+                    <div className="truncate">{resource.produit}</div>
+                  </div>
+                </div>
+                {resource.commentaire && (
+                  <div className="text-sm">
+                    <div className="text-xs text-muted-foreground">Commentaire</div>
+                    <div className="line-clamp-2 text-xs">{resource.commentaire}</div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
