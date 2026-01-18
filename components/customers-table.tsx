@@ -179,6 +179,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     telephone: "",
     adresse: "",
     produit_achete: "",
+    quantite: 1,
     date_achat: "",
     statut_client: "",
     commentaire: "",
@@ -250,6 +251,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       telephone: "",
       adresse: "",
       produit_achete: "",
+      quantite: 1,
       date_achat: "",
       statut_client: "",
       commentaire: "",
@@ -342,6 +344,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       telephone: customer.telephone || "",
       adresse: customer.adresse || "",
       produit_achete: customer.produit_achete || "",
+      quantite: customer.quantite || 1,
       date_achat: customer.date_achat || "",
       statut_client: customer.statut_client || "",
       commentaire: customer.commentaire || "",
@@ -409,14 +412,30 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       </div>
       <div className="space-y-2">
         <Label htmlFor={isEdit ? "edit_produit_achete" : "produit_achete"}>Produit acheté</Label>
-        <ProductCombobox
-          value={formData.produit_achete}
-          onChange={handleProductChange}
-          existingProducts={existingProducts}
-        />
-        <p className="text-xs text-muted-foreground">
-          Sélectionnez un produit existant ou tapez pour en créer un nouveau
-        </p>
+        <div className="flex gap-2 items-start">
+          <div className="w-20 shrink-0">
+            <Input
+              id={isEdit ? "edit_quantite" : "quantite"}
+              name="quantite"
+              type="number"
+              min="1"
+              value={formData.quantite}
+              onChange={(e) => setFormData({ ...formData, quantite: Math.max(1, parseInt(e.target.value) || 1) })}
+              className="text-center"
+            />
+            <p className="text-xs text-muted-foreground text-center mt-1">Qté</p>
+          </div>
+          <div className="flex-1">
+            <ProductCombobox
+              value={formData.produit_achete}
+              onChange={handleProductChange}
+              existingProducts={existingProducts}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Sélectionnez un produit existant ou tapez pour en créer un nouveau
+            </p>
+          </div>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor={isEdit ? "edit_commentaire" : "commentaire"}>Commentaire</Label>
@@ -498,7 +517,11 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                     <TableCell>{customer.prenom || "-"}</TableCell>
                     <TableCell>{customer.telephone || "-"}</TableCell>
                     <TableCell>{customer.adresse || "-"}</TableCell>
-                    <TableCell>{customer.produit_achete || "-"}</TableCell>
+                    <TableCell>
+                      {customer.produit_achete
+                        ? `${customer.quantite || 1} x ${customer.produit_achete}`
+                        : "-"}
+                    </TableCell>
                     <TableCell>{customer.date_achat || "-"}</TableCell>
                     <TableCell>
                       {customer.statut_client
@@ -611,7 +634,11 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                   </div>
                   <div className="col-span-2">
                     <div className="text-xs text-muted-foreground">Produit</div>
-                    <div className="truncate">{customer.produit_achete || "-"}</div>
+                    <div className="truncate">
+                      {customer.produit_achete
+                        ? `${customer.quantite || 1} x ${customer.produit_achete}`
+                        : "-"}
+                    </div>
                   </div>
                 </div>
                 {customer.adresse && (
