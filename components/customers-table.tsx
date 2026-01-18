@@ -33,6 +33,134 @@ interface CustomersTableProps {
   initialCustomers: Customer[]
 }
 
+interface CustomerFormData {
+  client_id: string
+  nom: string
+  prenom: string
+  telephone: string
+  adresse: string
+  produit_achete: string
+  quantite: number
+  date_achat: string
+  statut_client: string
+  commentaire: string
+}
+
+// Form fields component to avoid duplication
+const FormFields = ({
+  isEdit = false,
+  formData,
+  setFormData,
+  handleInputChange,
+  handleSelectChange,
+  handleProductChange,
+  existingProducts
+}: {
+  isEdit?: boolean
+  formData: CustomerFormData
+  setFormData: React.Dispatch<React.SetStateAction<CustomerFormData>>
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  handleSelectChange: (name: string, value: string) => void
+  handleProductChange: (value: string) => void
+  existingProducts: string[]
+}) => (
+  <>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_client_id" : "client_id"}>ID Client (modifiable)</Label>
+        <Input
+          id={isEdit ? "edit_client_id" : "client_id"}
+          name="client_id"
+          value={formData.client_id}
+          onChange={handleInputChange}
+          placeholder="CLT-001"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_nom" : "nom"}>Nom</Label>
+        <Input id={isEdit ? "edit_nom" : "nom"} name="nom" value={formData.nom} onChange={handleInputChange} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_prenom" : "prenom"}>Prénom</Label>
+        <Input id={isEdit ? "edit_prenom" : "prenom"} name="prenom" value={formData.prenom} onChange={handleInputChange} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_telephone" : "telephone"}>Téléphone</Label>
+        <Input id={isEdit ? "edit_telephone" : "telephone"} name="telephone" value={formData.telephone} onChange={handleInputChange} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_date_achat" : "date_achat"}>Date d'achat</Label>
+        <Input
+          id={isEdit ? "edit_date_achat" : "date_achat"}
+          name="date_achat"
+          type="date"
+          value={formData.date_achat}
+          onChange={handleInputChange}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_statut_client" : "statut_client"}>Statut du client</Label>
+        <Select
+          value={formData.statut_client}
+          onValueChange={(value) => handleSelectChange("statut_client", value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Sélectionner un statut" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor={isEdit ? "edit_adresse" : "adresse"}>Adresse</Label>
+        <Input id={isEdit ? "edit_adresse" : "adresse"} name="adresse" value={formData.adresse} onChange={handleInputChange} />
+      </div>
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor={isEdit ? "edit_produit_achete" : "produit_achete"}>Produit acheté</Label>
+      <div className="flex gap-2 items-start">
+        <div className="w-20 shrink-0">
+          <Input
+            id={isEdit ? "edit_quantite" : "quantite"}
+            name="quantite"
+            type="number"
+            min="1"
+            value={formData.quantite}
+            onChange={(e) => setFormData({ ...formData, quantite: Math.max(1, parseInt(e.target.value) || 1) })}
+            className="text-center"
+          />
+          <p className="text-xs text-muted-foreground text-center mt-1">Qté</p>
+        </div>
+        <div className="flex-1">
+          <ProductCombobox
+            value={formData.produit_achete}
+            onChange={handleProductChange}
+            existingProducts={existingProducts}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Sélectionnez un produit existant ou tapez pour en créer un nouveau
+          </p>
+        </div>
+      </div>
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor={isEdit ? "edit_commentaire" : "commentaire"}>Commentaire</Label>
+      <Textarea
+        id={isEdit ? "edit_commentaire" : "commentaire"}
+        name="commentaire"
+        value={formData.commentaire}
+        onChange={handleInputChange}
+        rows={3}
+      />
+    </div>
+  </>
+)
+
 // Product Combobox Component with create functionality
 function ProductCombobox({
   value,
@@ -90,7 +218,6 @@ function ProductCombobox({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value)
     onChange(e.target.value)
-    setOpen(true)
   }
 
   const handleAddNew = () => {
@@ -172,7 +299,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CustomerFormData>({
     client_id: "",
     nom: "",
     prenom: "",
@@ -211,7 +338,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       .map((c) => c.client_id)
       .filter((id) => id && id.startsWith("CLT-"))
       .map((id) => {
-        const num = Number.parseInt(id.split("-")[1])
+        const num = Number.parseInt(id!.split("-")[1])
         return isNaN(num) ? 0 : num
       })
 
@@ -351,105 +478,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     })
   }
 
-  // Form fields component to avoid duplication
-  const FormFields = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_client_id" : "client_id"}>ID Client (modifiable)</Label>
-          <Input
-            id={isEdit ? "edit_client_id" : "client_id"}
-            name="client_id"
-            value={formData.client_id}
-            onChange={handleInputChange}
-            placeholder="CLT-001"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_nom" : "nom"}>Nom</Label>
-          <Input id={isEdit ? "edit_nom" : "nom"} name="nom" value={formData.nom} onChange={handleInputChange} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_prenom" : "prenom"}>Prénom</Label>
-          <Input id={isEdit ? "edit_prenom" : "prenom"} name="prenom" value={formData.prenom} onChange={handleInputChange} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_telephone" : "telephone"}>Téléphone</Label>
-          <Input id={isEdit ? "edit_telephone" : "telephone"} name="telephone" value={formData.telephone} onChange={handleInputChange} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_date_achat" : "date_achat"}>Date d'achat</Label>
-          <Input
-            id={isEdit ? "edit_date_achat" : "date_achat"}
-            name="date_achat"
-            type="date"
-            value={formData.date_achat}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit_statut_client" : "statut_client"}>Statut du client</Label>
-          <Select
-            value={formData.statut_client}
-            onValueChange={(value) => handleSelectChange("statut_client", value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionner un statut" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={isEdit ? "edit_adresse" : "adresse"}>Adresse</Label>
-          <Input id={isEdit ? "edit_adresse" : "adresse"} name="adresse" value={formData.adresse} onChange={handleInputChange} />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_produit_achete" : "produit_achete"}>Produit acheté</Label>
-        <div className="flex gap-2 items-start">
-          <div className="w-20 shrink-0">
-            <Input
-              id={isEdit ? "edit_quantite" : "quantite"}
-              name="quantite"
-              type="number"
-              min="1"
-              value={formData.quantite}
-              onChange={(e) => setFormData({ ...formData, quantite: Math.max(1, parseInt(e.target.value) || 1) })}
-              className="text-center"
-            />
-            <p className="text-xs text-muted-foreground text-center mt-1">Qté</p>
-          </div>
-          <div className="flex-1">
-            <ProductCombobox
-              value={formData.produit_achete}
-              onChange={handleProductChange}
-              existingProducts={existingProducts}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Sélectionnez un produit existant ou tapez pour en créer un nouveau
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_commentaire" : "commentaire"}>Commentaire</Label>
-        <Textarea
-          id={isEdit ? "edit_commentaire" : "commentaire"}
-          name="commentaire"
-          value={formData.commentaire}
-          onChange={handleInputChange}
-          rows={3}
-        />
-      </div>
-    </>
-  )
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -475,7 +503,14 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
               <DialogDescription>Remplissez les informations du client</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCustomer} className="space-y-4">
-              <FormFields />
+              <FormFields
+                formData={formData}
+                setFormData={setFormData}
+                handleInputChange={handleInputChange}
+                handleSelectChange={handleSelectChange}
+                handleProductChange={handleProductChange}
+                existingProducts={existingProducts}
+              />
               <Button type="submit" className="w-full">
                 Ajouter
               </Button>
@@ -547,7 +582,15 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                               <DialogDescription>Modifiez les informations du client</DialogDescription>
                             </DialogHeader>
                             <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                              <FormFields isEdit />
+                              <FormFields
+                                isEdit
+                                formData={formData}
+                                setFormData={setFormData}
+                                handleInputChange={handleInputChange}
+                                handleSelectChange={handleSelectChange}
+                                handleProductChange={handleProductChange}
+                                existingProducts={existingProducts}
+                              />
                               <Button type="submit" className="w-full">
                                 Mettre à jour
                               </Button>
@@ -601,7 +644,15 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                           <DialogDescription>Modifiez les informations du client</DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                          <FormFields isEdit />
+                          <FormFields
+                            isEdit
+                            formData={formData}
+                            setFormData={setFormData}
+                            handleInputChange={handleInputChange}
+                            handleSelectChange={handleSelectChange}
+                            handleProductChange={handleProductChange}
+                            existingProducts={existingProducts}
+                          />
                           <Button type="submit" className="w-full">
                             Mettre à jour
                           </Button>
