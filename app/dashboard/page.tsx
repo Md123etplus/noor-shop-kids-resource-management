@@ -17,14 +17,12 @@ export default async function DashboardPage() {
       redirect("/login")
     }
 
-    // Fetch statistics
     const { data: customers } = await supabase.from("customers").select("*")
     const { data: resources } = await supabase.from("ressources_clients").select("*")
 
     const totalCustomers = customers?.length || 0
     const totalResources = resources?.length || 0
 
-    // Calculate customers this month
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const customersThisMonth =
@@ -33,7 +31,6 @@ export default async function DashboardPage() {
         return new Date(c.created_at) >= firstDayOfMonth
       }).length || 0
 
-    // Calculate recent purchases (last 30 days)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     const recentPurchases =
@@ -42,7 +39,6 @@ export default async function DashboardPage() {
         return new Date(c.date_achat) >= thirtyDaysAgo
       }).length || 0
 
-    // Get recent customers
     const recentCustomers = customers?.slice(0, 5) || []
 
     return (
@@ -51,48 +47,48 @@ export default async function DashboardPage() {
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Tableau de bord</h2>
         </div>
 
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Clients</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalCustomers}</div>
-              <p className="text-xs text-muted-foreground">Clients enregistrés</p>
+              <div className="text-xl sm:text-2xl font-bold">{totalCustomers}</div>
+              <p className="text-xs text-muted-foreground hidden sm:block">Clients enregistrés</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ressources</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Ressources</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalResources}</div>
-              <p className="text-xs text-muted-foreground">Ressources enregistrées</p>
+              <div className="text-xl sm:text-2xl font-bold">{totalResources}</div>
+              <p className="text-xs text-muted-foreground hidden sm:block">Ressources enregistrées</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Nouveaux ce mois</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Nouveaux ce mois</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{customersThisMonth}</div>
-              <p className="text-xs text-muted-foreground">Clients ajoutés ce mois</p>
+              <div className="text-xl sm:text-2xl font-bold">{customersThisMonth}</div>
+              <p className="text-xs text-muted-foreground hidden sm:block">Clients ajoutés</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Achats récents</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Achats récents</CardTitle>
               <ShoppingBag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{recentPurchases}</div>
-              <p className="text-xs text-muted-foreground">30 derniers jours</p>
+              <div className="text-xl sm:text-2xl font-bold">{recentPurchases}</div>
+              <p className="text-xs text-muted-foreground hidden sm:block">30 derniers jours</p>
             </CardContent>
           </Card>
         </div>

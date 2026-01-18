@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import type { Customer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Check, ChevronsUpDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 const STATUS_OPTIONS = [
@@ -33,6 +33,140 @@ interface CustomersTableProps {
   initialCustomers: Customer[]
 }
 
+// Product Combobox Component with create functionality
+function ProductCombobox({
+  value,
+  onChange,
+  existingProducts,
+}: {
+  value: string
+  onChange: (value: string) => void
+  existingProducts: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [inputValue, setInputValue] = useState(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setInputValue(value)
+  }, [value])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const filteredProducts = useMemo(() => {
+    if (!inputValue) return existingProducts
+    return existingProducts.filter((product) =>
+      product.toLowerCase().includes(inputValue.toLowerCase())
+    )
+  }, [existingProducts, inputValue])
+
+  const isNewProduct = useMemo(() => {
+    if (!inputValue.trim()) return false
+    return !existingProducts.some(
+      (product) => product.toLowerCase() === inputValue.trim().toLowerCase()
+    )
+  }, [existingProducts, inputValue])
+
+  const handleSelect = (product: string) => {
+    onChange(product)
+    setInputValue(product)
+    setOpen(false)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value)
+    onChange(e.target.value)
+    setOpen(true)
+  }
+
+  const handleAddNew = () => {
+    if (inputValue.trim()) {
+      onChange(inputValue.trim())
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => setOpen(true)}
+          placeholder="Sélectionner ou créer un produit..."
+          className="pr-8"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 top-0 h-full px-2"
+          onClick={() => setOpen(!open)}
+        >
+          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </div>
+      {open && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md max-h-60 overflow-y-auto"
+        >
+          {filteredProducts.length === 0 && !isNewProduct ? (
+            <div className="py-2 px-3 text-sm text-muted-foreground">
+              Aucun produit trouvé. Tapez pour créer.
+            </div>
+          ) : (
+            <>
+              {filteredProducts.map((product) => (
+                <button
+                  key={product}
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-accent text-left"
+                  onClick={() => handleSelect(product)}
+                >
+                  <Check
+                    className={`h-4 w-4 ${
+                      value.toLowerCase() === product.toLowerCase()
+                        ? "opacity-100"
+                        : "opacity-0"
+                    }`}
+                  />
+                  {product}
+                </button>
+              ))}
+              {isNewProduct && (
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-accent text-left border-t mt-1 pt-2 text-primary font-medium"
+                  onClick={handleAddNew}
+                >
+                  <Plus className="h-4 w-4" />
+                  Créer "{inputValue.trim()}"
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
   const [searchTerm, setSearchTerm] = useState("")
@@ -43,7 +177,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     nom: "",
     prenom: "",
     telephone: "",
-    email: "",
     adresse: "",
     produit_achete: "",
     date_achat: "",
@@ -52,12 +185,27 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   })
   const router = useRouter()
 
+  // Extract unique products from all customers (case-insensitive deduplication)
+  const existingProducts = useMemo(() => {
+    const productMap = new Map<string, string>()
+    customers.forEach((customer) => {
+      if (customer.produit_achete?.trim()) {
+        const lowerCase = customer.produit_achete.trim().toLowerCase()
+        if (!productMap.has(lowerCase)) {
+          productMap.set(lowerCase, customer.produit_achete.trim())
+        }
+      }
+    })
+    return Array.from(productMap.values()).sort((a, b) =>
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    )
+  }, [customers])
+
   const generateNextClientId = () => {
     if (customers.length === 0) {
       return "CLT-001"
     }
 
-    // Find the highest client ID number
     const clientIds = customers
       .map((c) => c.client_id)
       .filter((id) => id && id.startsWith("CLT-"))
@@ -77,7 +225,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         customer.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.prenom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.telephone?.includes(searchTerm) ||
-        customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.client_id?.toLowerCase().includes(searchTerm.toLowerCase()),
     )
   }, [customers, searchTerm])
@@ -90,6 +237,10 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     setFormData({ ...formData, [name]: value })
   }
 
+  const handleProductChange = (value: string) => {
+    setFormData({ ...formData, produit_achete: value })
+  }
+
   const resetForm = () => {
     const nextClientId = generateNextClientId()
     setFormData({
@@ -97,7 +248,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       nom: "",
       prenom: "",
       telephone: "",
-      email: "",
       adresse: "",
       produit_achete: "",
       date_achat: "",
@@ -132,7 +282,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       .single()
 
     if (error) {
-      console.error("[v0] Error adding customer:", error)
+      console.error("Error adding customer:", error)
       return
     }
 
@@ -157,7 +307,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       .single()
 
     if (error) {
-      console.error("[v0] Error updating customer:", error)
+      console.error("Error updating customer:", error)
       return
     }
 
@@ -175,7 +325,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     const { error } = await supabase.from("customers").delete().eq("id", id)
 
     if (error) {
-      console.error("[v0] Error deleting customer:", error)
+      console.error("Error deleting customer:", error)
       return
     }
 
@@ -190,7 +340,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       nom: customer.nom || "",
       prenom: customer.prenom || "",
       telephone: customer.telephone || "",
-      email: customer.email || "",
       adresse: customer.adresse || "",
       produit_achete: customer.produit_achete || "",
       date_achat: customer.date_achat || "",
@@ -198,6 +347,89 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       commentaire: customer.commentaire || "",
     })
   }
+
+  // Form fields component to avoid duplication
+  const FormFields = ({ isEdit = false }: { isEdit?: boolean }) => (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_client_id" : "client_id"}>ID Client (modifiable)</Label>
+          <Input
+            id={isEdit ? "edit_client_id" : "client_id"}
+            name="client_id"
+            value={formData.client_id}
+            onChange={handleInputChange}
+            placeholder="CLT-001"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_nom" : "nom"}>Nom</Label>
+          <Input id={isEdit ? "edit_nom" : "nom"} name="nom" value={formData.nom} onChange={handleInputChange} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_prenom" : "prenom"}>Prénom</Label>
+          <Input id={isEdit ? "edit_prenom" : "prenom"} name="prenom" value={formData.prenom} onChange={handleInputChange} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_telephone" : "telephone"}>Téléphone</Label>
+          <Input id={isEdit ? "edit_telephone" : "telephone"} name="telephone" value={formData.telephone} onChange={handleInputChange} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_date_achat" : "date_achat"}>Date d'achat</Label>
+          <Input
+            id={isEdit ? "edit_date_achat" : "date_achat"}
+            name="date_achat"
+            type="date"
+            value={formData.date_achat}
+            onChange={handleInputChange}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={isEdit ? "edit_statut_client" : "statut_client"}>Statut du client</Label>
+          <Select
+            value={formData.statut_client}
+            onValueChange={(value) => handleSelectChange("statut_client", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner un statut" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={isEdit ? "edit_adresse" : "adresse"}>Adresse</Label>
+          <Input id={isEdit ? "edit_adresse" : "adresse"} name="adresse" value={formData.adresse} onChange={handleInputChange} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_produit_achete" : "produit_achete"}>Produit acheté</Label>
+        <ProductCombobox
+          value={formData.produit_achete}
+          onChange={handleProductChange}
+          existingProducts={existingProducts}
+        />
+        <p className="text-xs text-muted-foreground">
+          Sélectionnez un produit existant ou tapez pour en créer un nouveau
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={isEdit ? "edit_commentaire" : "commentaire"}>Commentaire</Label>
+        <Textarea
+          id={isEdit ? "edit_commentaire" : "commentaire"}
+          name="commentaire"
+          value={formData.commentaire}
+          onChange={handleInputChange}
+          rows={3}
+        />
+      </div>
+    </>
+  )
 
   return (
     <div className="space-y-4">
@@ -224,85 +456,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
               <DialogDescription>Remplissez les informations du client</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCustomer} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="client_id">ID Client (modifiable)</Label>
-                  <Input
-                    id="client_id"
-                    name="client_id"
-                    value={formData.client_id}
-                    onChange={handleInputChange}
-                    placeholder="CLT-001"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
-                  <Input id="nom" name="nom" value={formData.nom} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom</Label>
-                  <Input id="prenom" name="prenom" value={formData.prenom} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telephone">Téléphone</Label>
-                  <Input id="telephone" name="telephone" value={formData.telephone} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date_achat">Date d'achat</Label>
-                  <Input
-                    id="date_achat"
-                    name="date_achat"
-                    type="date"
-                    value={formData.date_achat}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="statut_client">Statut du client</Label>
-                  <Select
-                    value={formData.statut_client}
-                    onValueChange={(value) => handleSelectChange("statut_client", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adresse">Adresse</Label>
-                  <Input id="adresse" name="adresse" value={formData.adresse} onChange={handleInputChange} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="produit_achete">Produit acheté</Label>
-                <Input
-                  id="produit_achete"
-                  name="produit_achete"
-                  value={formData.produit_achete}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="commentaire">Commentaire</Label>
-                <Textarea
-                  id="commentaire"
-                  name="commentaire"
-                  value={formData.commentaire}
-                  onChange={handleInputChange}
-                  rows={3}
-                />
-              </div>
+              <FormFields />
               <Button type="submit" className="w-full">
                 Ajouter
               </Button>
@@ -321,7 +475,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                 <TableHead>Nom</TableHead>
                 <TableHead>Prénom</TableHead>
                 <TableHead>Téléphone</TableHead>
-                <TableHead>Email</TableHead>
                 <TableHead>Adresse</TableHead>
                 <TableHead>Produit acheté</TableHead>
                 <TableHead>Date d'achat</TableHead>
@@ -333,7 +486,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     Aucun client trouvé
                   </TableCell>
                 </TableRow>
@@ -344,7 +497,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                     <TableCell>{customer.nom || "-"}</TableCell>
                     <TableCell>{customer.prenom || "-"}</TableCell>
                     <TableCell>{customer.telephone || "-"}</TableCell>
-                    <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.adresse || "-"}</TableCell>
                     <TableCell>{customer.produit_achete || "-"}</TableCell>
                     <TableCell>{customer.date_achat || "-"}</TableCell>
@@ -372,105 +524,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                               <DialogDescription>Modifiez les informations du client</DialogDescription>
                             </DialogHeader>
                             <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
-                                  <Input
-                                    id="edit_client_id"
-                                    name="client_id"
-                                    value={formData.client_id}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_nom">Nom</Label>
-                                  <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_prenom">Prénom</Label>
-                                  <Input
-                                    id="edit_prenom"
-                                    name="prenom"
-                                    value={formData.prenom}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_telephone">Téléphone</Label>
-                                  <Input
-                                    id="edit_telephone"
-                                    name="telephone"
-                                    value={formData.telephone}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_email">Email</Label>
-                                  <Input
-                                    id="edit_email"
-                                    name="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_date_achat">Date d'achat</Label>
-                                  <Input
-                                    id="edit_date_achat"
-                                    name="date_achat"
-                                    type="date"
-                                    value={formData.date_achat}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_statut_client">Statut du client</Label>
-                                  <Select
-                                    value={formData.statut_client}
-                                    onValueChange={(value) => handleSelectChange("statut_client", value)}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Sélectionner un statut" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {STATUS_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit_adresse">Adresse</Label>
-                                  <Input
-                                    id="edit_adresse"
-                                    name="adresse"
-                                    value={formData.adresse}
-                                    onChange={handleInputChange}
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_produit_achete">Produit acheté</Label>
-                                <Input
-                                  id="edit_produit_achete"
-                                  name="produit_achete"
-                                  value={formData.produit_achete}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit_commentaire">Commentaire</Label>
-                                <Textarea
-                                  id="edit_commentaire"
-                                  name="commentaire"
-                                  value={formData.commentaire}
-                                  onChange={handleInputChange}
-                                  rows={3}
-                                />
-                              </div>
+                              <FormFields isEdit />
                               <Button type="submit" className="w-full">
                                 Mettre à jour
                               </Button>
@@ -524,105 +578,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                           <DialogDescription>Modifiez les informations du client</DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
-                              <Input
-                                id="edit_client_id"
-                                name="client_id"
-                                value={formData.client_id}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_nom">Nom</Label>
-                              <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_prenom">Prénom</Label>
-                              <Input
-                                id="edit_prenom"
-                                name="prenom"
-                                value={formData.prenom}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_telephone">Téléphone</Label>
-                              <Input
-                                id="edit_telephone"
-                                name="telephone"
-                                value={formData.telephone}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_email">Email</Label>
-                              <Input
-                                id="edit_email"
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_date_achat">Date d'achat</Label>
-                              <Input
-                                id="edit_date_achat"
-                                name="date_achat"
-                                type="date"
-                                value={formData.date_achat}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_statut_client">Statut du client</Label>
-                              <Select
-                                value={formData.statut_client}
-                                onValueChange={(value) => handleSelectChange("statut_client", value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Sélectionner un statut" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STATUS_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit_adresse">Adresse</Label>
-                              <Input
-                                id="edit_adresse"
-                                name="adresse"
-                                value={formData.adresse}
-                                onChange={handleInputChange}
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit_produit_achete">Produit acheté</Label>
-                            <Input
-                              id="edit_produit_achete"
-                              name="produit_achete"
-                              value={formData.produit_achete}
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit_commentaire">Commentaire</Label>
-                            <Textarea
-                              id="edit_commentaire"
-                              name="commentaire"
-                              value={formData.commentaire}
-                              onChange={handleInputChange}
-                              rows={3}
-                            />
-                          </div>
+                          <FormFields isEdit />
                           <Button type="submit" className="w-full">
                             Mettre à jour
                           </Button>
@@ -645,14 +601,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                     <div className="truncate">{customer.telephone || "-"}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Email</div>
-                    <div className="truncate">{customer.email || "-"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Produit</div>
-                    <div className="truncate">{customer.produit_achete || "-"}</div>
-                  </div>
-                  <div>
                     <div className="text-xs text-muted-foreground">Statut</div>
                     <div className="truncate">
                       {customer.statut_client
@@ -660,6 +608,10 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                           customer.statut_client
                         : "-"}
                     </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-muted-foreground">Produit</div>
+                    <div className="truncate">{customer.produit_achete || "-"}</div>
                   </div>
                 </div>
                 {customer.adresse && (

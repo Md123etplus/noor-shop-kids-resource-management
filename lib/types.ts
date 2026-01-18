@@ -34,3 +34,5 @@ export interface Resource {
   updated_at: string
   user_id: string
 }
+
+// Stock interface has been removed
