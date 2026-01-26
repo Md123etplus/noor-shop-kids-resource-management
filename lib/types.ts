@@ -4,9 +4,9 @@ export interface Customer {
   nom: string | null
   prenom: string | null
   telephone: string | null
+  email: string | null
   adresse: string | null
   produit_achete: string | null
-  quantite: number | null
   date_achat: string | null
   statut_client: string | null
   commentaire: string | null

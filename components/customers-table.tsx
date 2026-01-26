@@ -306,8 +306,8 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       // Not JSON, use old format
     }
     
-    // Old format: single product with quantity
-    return [{ name: customer.produit_achete, quantity: customer.quantite || 1 }]
+    // Old format: single product string (no quantity column exists)
+    return [{ name: customer.produit_achete, quantity: 1 }]
   }
 
   // Format products for display
@@ -433,7 +433,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         telephone: formData.telephone,
         adresse: formData.adresse,
         produit_achete: productData,
-        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
         date_achat: formData.date_achat || null,
         statut_client: formData.statut_client || null,
         commentaire: formData.commentaire,
@@ -486,7 +485,6 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         telephone: formData.telephone,
         adresse: formData.adresse,
         produit_achete: productData,
-        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
         date_achat: formData.date_achat || null,
         statut_client: formData.statut_client || null,
         commentaire: formData.commentaire,
