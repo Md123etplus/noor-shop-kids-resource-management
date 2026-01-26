@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Search, Pencil, Trash2, Check, ChevronsUpDown, X } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Check, ChevronsUpDown, X, Download, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 const STATUS_OPTIONS = [
@@ -273,6 +273,152 @@ function ProductsList({
   )
 }
 
+// Export functions
+function exportToCSV(customers: Customer[], formatProductsDisplay: (customer: Customer) => string) {
+  const STATUS_LABELS: Record<string, string> = {
+    nouveau: "Nouveau",
+    actif: "Actif",
+    inactif: "Inactif",
+    vip: "VIP",
+    en_attente: "En attente",
+  }
+
+  const headers = [
+    "ID Client",
+    "Nom",
+    "Prénom",
+    "Téléphone",
+    "Adresse",
+    "Produits achetés",
+    "Date d'achat",
+    "Statut",
+    "Commentaire",
+  ]
+
+  const csvContent = [
+    headers.join(";"),
+    ...customers.map((c) => [
+      c.client_id || "",
+      c.nom || "",
+      c.prenom || "",
+      c.telephone || "",
+      c.adresse || "",
+      formatProductsDisplay(c).replace(/;/g, ","),
+      c.date_achat || "",
+      c.statut_client ? STATUS_LABELS[c.statut_client] || c.statut_client : "",
+      (c.commentaire || "").replace(/;/g, ",").replace(/\n/g, " "),
+    ].map(field => `"${field}"`).join(";"))
+  ].join("\n")
+
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `clients_${new Date().toISOString().split("T")[0]}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function exportToPDF(customers: Customer[], formatProductsDisplay: (customer: Customer) => string) {
+  const STATUS_LABELS: Record<string, string> = {
+    nouveau: "Nouveau",
+    actif: "Actif",
+    inactif: "Inactif",
+    vip: "VIP",
+    en_attente: "En attente",
+  }
+
+  const printWindow = window.open("", "_blank")
+  if (!printWindow) {
+    alert("Veuillez autoriser les popups pour exporter en PDF")
+    return
+  }
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <title>Liste des Clients - NoorShop Kids</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1; }
+        .header h1 { color: #6366f1; font-size: 24px; margin-bottom: 5px; }
+        .header p { color: #666; font-size: 12px; }
+        .stats { display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #6366f1; }
+        .stat-label { font-size: 11px; color: #666; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th { background: #6366f1; color: white; padding: 10px 6px; text-align: left; font-weight: 600; }
+        td { padding: 8px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+        tr:nth-child(even) { background: #f9fafb; }
+        .truncate { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+        @media print {
+          body { padding: 10px; }
+          .header { margin-bottom: 15px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>NoorShop Kids</h1>
+        <p>Liste des Clients - Exporté le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">${customers.length}</div>
+          <div class="stat-label">Total Clients</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Prénom</th>
+            <th>Téléphone</th>
+            <th>Adresse</th>
+            <th>Produits</th>
+            <th>Date</th>
+            <th>Statut</th>
+            <th>Commentaire</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${customers.map(c => `
+            <tr>
+              <td>${c.client_id || "-"}</td>
+              <td>${c.nom || "-"}</td>
+              <td>${c.prenom || "-"}</td>
+              <td>${c.telephone || "-"}</td>
+              <td class="truncate" title="${c.adresse || ""}">${c.adresse || "-"}</td>
+              <td class="truncate" title="${formatProductsDisplay(c)}">${formatProductsDisplay(c)}</td>
+              <td>${c.date_achat || "-"}</td>
+              <td>${c.statut_client ? STATUS_LABELS[c.statut_client] || c.statut_client : "-"}</td>
+              <td class="truncate" title="${c.commentaire || ""}">${c.commentaire || "-"}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      <div class="footer">
+        <p>NoorShop Kids - Gestion des Ressources</p>
+      </div>
+      <script>
+        window.onload = function() { window.print(); }
+      </script>
+    </body>
+    </html>
+  `
+
+  printWindow.document.write(htmlContent)
+  printWindow.document.close()
+}
+
 export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
   const [searchTerm, setSearchTerm] = useState("")
@@ -306,8 +452,8 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       // Not JSON, use old format
     }
     
-    // Old format: single product string (no quantity column exists)
-    return [{ name: customer.produit_achete, quantity: 1 }]
+    // Old format: single product with quantity
+    return [{ name: customer.produit_achete, quantity: customer.quantite || 1 }]
   }
 
   // Format products for display
@@ -433,6 +579,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         telephone: formData.telephone,
         adresse: formData.adresse,
         produit_achete: productData,
+        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
         date_achat: formData.date_achat || null,
         statut_client: formData.statut_client || null,
         commentaire: formData.commentaire,
@@ -485,6 +632,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         telephone: formData.telephone,
         adresse: formData.adresse,
         produit_achete: productData,
+        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
         date_achat: formData.date_achat || null,
         statut_client: formData.statut_client || null,
         commentaire: formData.commentaire,
@@ -565,13 +713,32 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
             className="pl-9"
           />
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openAddDialog} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Ajouter un client
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => exportToCSV(filteredCustomers, formatProductsDisplay)}
+            className="flex-1 sm:flex-none bg-transparent"
+            title="Exporter en CSV"
+          >
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">CSV</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => exportToPDF(filteredCustomers, formatProductsDisplay)}
+            className="flex-1 sm:flex-none bg-transparent"
+            title="Exporter en PDF"
+          >
+            <FileText className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openAddDialog} className="flex-1 sm:flex-none">
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Ajouter un nouveau client</DialogTitle>
@@ -655,6 +822,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="rounded-md border bg-card">

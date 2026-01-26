@@ -2,8 +2,34 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, ShoppingBag, TrendingUp, Package } from "lucide-react"
+import { Users, ShoppingBag, TrendingUp, Package, Trophy, BarChart3 } from "lucide-react"
 import Link from "next/link"
+
+interface ProductItem {
+  name: string
+  quantity: number
+}
+
+interface ProductStats {
+  name: string
+  totalQuantity: number
+  purchaseCount: number
+}
+
+function parseProducts(produit_achete: string | null, quantite: number | null): ProductItem[] {
+  if (!produit_achete) return []
+  
+  try {
+    const parsed = JSON.parse(produit_achete)
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed
+    }
+  } catch {
+    // Not JSON, use old format
+  }
+  
+  return [{ name: produit_achete, quantity: quantite || 1 }]
+}
 
 export default async function DashboardPage() {
   try {
@@ -40,6 +66,36 @@ export default async function DashboardPage() {
       }).length || 0
 
     const recentCustomers = customers?.slice(0, 5) || []
+
+    // Calculate product statistics
+    const productStatsMap = new Map<string, ProductStats>()
+    
+    customers?.forEach((customer) => {
+      const products = parseProducts(customer.produit_achete, customer.quantite)
+      products.forEach((product) => {
+        if (product.name?.trim()) {
+          const key = product.name.trim().toLowerCase()
+          const existing = productStatsMap.get(key)
+          if (existing) {
+            existing.totalQuantity += product.quantity
+            existing.purchaseCount += 1
+          } else {
+            productStatsMap.set(key, {
+              name: product.name.trim(),
+              totalQuantity: product.quantity,
+              purchaseCount: 1,
+            })
+          }
+        }
+      })
+    })
+
+    const productStats = Array.from(productStatsMap.values())
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+    
+    const topProduct = productStats[0] || null
+    const topProducts = productStats.slice(0, 5)
+    const totalProductsSold = productStats.reduce((acc, p) => acc + p.totalQuantity, 0)
 
     return (
       <div className="space-y-4">
@@ -92,6 +148,99 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Top Product Highlight */}
+        {topProduct && (
+          <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardHeader className="relative">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Trophy className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg sm:text-xl">Produit le plus vendu</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">Meilleur performeur de votre boutique</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-primary">{topProduct.name}</p>
+                  <div className="flex gap-4 mt-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Quantité vendue</p>
+                      <p className="text-xl font-semibold">{topProduct.totalQuantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Nombre d'achats</p>
+                      <p className="text-xl font-semibold">{topProduct.purchaseCount}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total produits vendus</p>
+                  <p className="text-2xl font-bold">{totalProductsSold}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Product Statistics */}
+        {topProducts.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <CardTitle className="text-lg sm:text-xl">Top 5 Produits</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">Classement par quantité vendue</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {topProducts.map((product, index) => {
+                  const maxQuantity = topProducts[0].totalQuantity
+                  const percentage = (product.totalQuantity / maxQuantity) * 100
+                  return (
+                    <div key={product.name} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                            index === 0 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </span>
+                          <span className="font-medium truncate max-w-[150px] sm:max-w-[250px]">{product.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-right">
+                          <span className="text-muted-foreground text-xs hidden sm:inline">
+                            {product.purchaseCount} achat{product.purchaseCount > 1 ? 's' : ''}
+                          </span>
+                          <span className="font-semibold">{product.totalQuantity}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all ${
+                            index === 0 ? 'bg-primary' : 'bg-primary/60'
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
           <Card className="lg:col-span-4">
