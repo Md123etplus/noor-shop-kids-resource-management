@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import type { Customer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Search, Pencil, Trash2, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Check, ChevronsUpDown, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 const STATUS_OPTIONS = [
@@ -28,6 +28,11 @@ const STATUS_OPTIONS = [
   { value: "vip", label: "VIP" },
   { value: "en_attente", label: "En attente" },
 ]
+
+interface ProductItem {
+  name: string
+  quantity: number
+}
 
 interface CustomersTableProps {
   initialCustomers: Customer[]
@@ -39,127 +44,11 @@ interface CustomerFormData {
   prenom: string
   telephone: string
   adresse: string
-  produit_achete: string
-  quantite: number
+  products: ProductItem[]
   date_achat: string
   statut_client: string
   commentaire: string
 }
-
-// Form fields component to avoid duplication
-const FormFields = ({
-  isEdit = false,
-  formData,
-  setFormData,
-  handleInputChange,
-  handleSelectChange,
-  handleProductChange,
-  existingProducts
-}: {
-  isEdit?: boolean
-  formData: CustomerFormData
-  setFormData: React.Dispatch<React.SetStateAction<CustomerFormData>>
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
-  handleSelectChange: (name: string, value: string) => void
-  handleProductChange: (value: string) => void
-  existingProducts: string[]
-}) => (
-  <>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_client_id" : "client_id"}>ID Client (modifiable)</Label>
-        <Input
-          id={isEdit ? "edit_client_id" : "client_id"}
-          name="client_id"
-          value={formData.client_id}
-          onChange={handleInputChange}
-          placeholder="CLT-001"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_nom" : "nom"}>Nom</Label>
-        <Input id={isEdit ? "edit_nom" : "nom"} name="nom" value={formData.nom} onChange={handleInputChange} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_prenom" : "prenom"}>Prénom</Label>
-        <Input id={isEdit ? "edit_prenom" : "prenom"} name="prenom" value={formData.prenom} onChange={handleInputChange} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_telephone" : "telephone"}>Téléphone</Label>
-        <Input id={isEdit ? "edit_telephone" : "telephone"} name="telephone" value={formData.telephone} onChange={handleInputChange} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_date_achat" : "date_achat"}>Date d'achat</Label>
-        <Input
-          id={isEdit ? "edit_date_achat" : "date_achat"}
-          name="date_achat"
-          type="date"
-          value={formData.date_achat}
-          onChange={handleInputChange}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit_statut_client" : "statut_client"}>Statut du client</Label>
-        <Select
-          value={formData.statut_client}
-          onValueChange={(value) => handleSelectChange("statut_client", value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Sélectionner un statut" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor={isEdit ? "edit_adresse" : "adresse"}>Adresse</Label>
-        <Input id={isEdit ? "edit_adresse" : "adresse"} name="adresse" value={formData.adresse} onChange={handleInputChange} />
-      </div>
-    </div>
-    <div className="space-y-2">
-      <Label htmlFor={isEdit ? "edit_produit_achete" : "produit_achete"}>Produit acheté</Label>
-      <div className="flex gap-2 items-start">
-        <div className="w-20 shrink-0">
-          <Input
-            id={isEdit ? "edit_quantite" : "quantite"}
-            name="quantite"
-            type="number"
-            min="1"
-            value={formData.quantite}
-            onChange={(e) => setFormData({ ...formData, quantite: Math.max(1, parseInt(e.target.value) || 1) })}
-            className="text-center"
-          />
-          <p className="text-xs text-muted-foreground text-center mt-1">Qté</p>
-        </div>
-        <div className="flex-1">
-          <ProductCombobox
-            value={formData.produit_achete}
-            onChange={handleProductChange}
-            existingProducts={existingProducts}
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Sélectionnez un produit existant ou tapez pour en créer un nouveau
-          </p>
-        </div>
-      </div>
-    </div>
-    <div className="space-y-2">
-      <Label htmlFor={isEdit ? "edit_commentaire" : "commentaire"}>Commentaire</Label>
-      <Textarea
-        id={isEdit ? "edit_commentaire" : "commentaire"}
-        name="commentaire"
-        value={formData.commentaire}
-        onChange={handleInputChange}
-        rows={3}
-      />
-    </div>
-  </>
-)
 
 // Product Combobox Component with create functionality
 function ProductCombobox({
@@ -215,9 +104,10 @@ function ProductCombobox({
     setOpen(false)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value)
-    onChange(e.target.value)
+  const handleInputChangeLocal = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setInputValue(newValue)
+    onChange(newValue)
   }
 
   const handleAddNew = () => {
@@ -233,7 +123,7 @@ function ProductCombobox({
         <Input
           ref={inputRef}
           value={inputValue}
-          onChange={handleInputChange}
+          onChange={handleInputChangeLocal}
           onFocus={() => setOpen(true)}
           placeholder="Sélectionner ou créer un produit..."
           className="pr-8"
@@ -294,42 +184,162 @@ function ProductCombobox({
   )
 }
 
+// Product list component for adding multiple products
+function ProductsList({
+  products,
+  onProductsChange,
+  existingProducts,
+}: {
+  products: ProductItem[]
+  onProductsChange: (products: ProductItem[]) => void
+  existingProducts: string[]
+}) {
+  const handleProductNameChange = (index: number, name: string) => {
+    const newProducts = [...products]
+    newProducts[index] = { ...newProducts[index], name }
+    onProductsChange(newProducts)
+  }
+
+  const handleQuantityChange = (index: number, quantity: number) => {
+    const newProducts = [...products]
+    newProducts[index] = { ...newProducts[index], quantity: Math.max(1, quantity) }
+    onProductsChange(newProducts)
+  }
+
+  const addProduct = () => {
+    onProductsChange([...products, { name: "", quantity: 1 }])
+  }
+
+  const removeProduct = (index: number) => {
+    if (products.length > 1) {
+      const newProducts = products.filter((_, i) => i !== index)
+      onProductsChange(newProducts)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label>Produits achetés</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addProduct}
+          className="h-7 text-xs bg-transparent"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Ajouter produit
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {products.map((product, index) => (
+          <div key={index} className="flex gap-2 items-start">
+            <div className="w-16 shrink-0">
+              <Input
+                type="number"
+                min="1"
+                value={product.quantity}
+                onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                className="text-center h-9"
+              />
+              <p className="text-xs text-muted-foreground text-center mt-0.5">Qté</p>
+            </div>
+            <div className="flex-1">
+              <ProductCombobox
+                value={product.name}
+                onChange={(value) => handleProductNameChange(index, value)}
+                existingProducts={existingProducts}
+              />
+            </div>
+            {products.length > 1 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+                onClick={() => removeProduct(index)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Sélectionnez un produit existant ou tapez pour en créer un nouveau
+      </p>
+    </div>
+  )
+}
+
 export function CustomersTable({ initialCustomers }: CustomersTableProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<CustomerFormData>({
     client_id: "",
     nom: "",
     prenom: "",
     telephone: "",
     adresse: "",
-    produit_achete: "",
-    quantite: 1,
+    products: [{ name: "", quantity: 1 }],
     date_achat: "",
     statut_client: "",
     commentaire: "",
   })
   const router = useRouter()
 
+  // Parse products from customer data (supports both old format and new JSON format)
+  const parseProducts = (customer: Customer): ProductItem[] => {
+    if (!customer.produit_achete) return [{ name: "", quantity: 1 }]
+    
+    // Try to parse as JSON array first
+    try {
+      const parsed = JSON.parse(customer.produit_achete)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    } catch {
+      // Not JSON, use old format
+    }
+    
+    // Old format: single product with quantity
+    return [{ name: customer.produit_achete, quantity: customer.quantite || 1 }]
+  }
+
+  // Format products for display
+  const formatProductsDisplay = (customer: Customer): string => {
+    const products = parseProducts(customer)
+    if (products.length === 0 || (products.length === 1 && !products[0].name)) return "-"
+    return products
+      .filter(p => p.name)
+      .map(p => `${p.quantity} x ${p.name}`)
+      .join(", ")
+  }
+
   // Extract unique products from all customers (case-insensitive deduplication)
   const existingProducts = useMemo(() => {
     const productMap = new Map<string, string>()
     customers.forEach((customer) => {
-      if (customer.produit_achete?.trim()) {
-        const lowerCase = customer.produit_achete.trim().toLowerCase()
-        if (!productMap.has(lowerCase)) {
-          productMap.set(lowerCase, customer.produit_achete.trim())
+      const products = parseProducts(customer)
+      products.forEach(product => {
+        if (product.name?.trim()) {
+          const lowerCase = product.name.trim().toLowerCase()
+          if (!productMap.has(lowerCase)) {
+            productMap.set(lowerCase, product.name.trim())
+          }
         }
-      }
+      })
     })
     return Array.from(productMap.values()).sort((a, b) =>
       a.toLowerCase().localeCompare(b.toLowerCase())
     )
   }, [customers])
 
-  const generateNextClientId = () => {
+  const generateNextClientId = useCallback(() => {
     if (customers.length === 0) {
       return "CLT-001"
     }
@@ -345,7 +355,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     const maxId = Math.max(0, ...clientIds)
     const nextId = maxId + 1
     return `CLT-${String(nextId).padStart(3, "0")}`
-  }
+  }, [customers])
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(
@@ -357,19 +367,20 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     )
   }, [customers, searchTerm])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }, [])
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value })
-  }
+  const handleSelectChange = useCallback((name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }, [])
 
-  const handleProductChange = (value: string) => {
-    setFormData({ ...formData, produit_achete: value })
-  }
+  const handleProductsChange = useCallback((products: ProductItem[]) => {
+    setFormData(prev => ({ ...prev, products }))
+  }, [])
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     const nextClientId = generateNextClientId()
     setFormData({
       client_id: nextClientId,
@@ -377,73 +388,135 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       prenom: "",
       telephone: "",
       adresse: "",
-      produit_achete: "",
-      quantite: 1,
+      products: [{ name: "", quantity: 1 }],
       date_achat: "",
       statut_client: "",
       commentaire: "",
     })
     setEditingCustomer(null)
-  }
+  }, [generateNextClientId])
 
   useEffect(() => {
     if (isAddDialogOpen && !editingCustomer) {
       const nextClientId = generateNextClientId()
       setFormData((prev) => ({ ...prev, client_id: nextClientId }))
     }
-  }, [isAddDialogOpen, editingCustomer])
+  }, [isAddDialogOpen, editingCustomer, generateNextClientId])
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    if (!user) return
+      if (!user) {
+        console.log("[v0] No user found")
+        setIsSubmitting(false)
+        return
+      }
 
-    const { data, error } = await supabase
-      .from("customers")
-      .insert([{ ...formData, user_id: user.id }])
-      .select()
-      .single()
+      // Filter out empty products and prepare data
+      const validProducts = formData.products.filter(p => p.name.trim())
+      const productData = validProducts.length > 0 ? JSON.stringify(validProducts) : null
 
-    if (error) {
-      console.error("Error adding customer:", error)
-      return
+      const insertData = {
+        client_id: formData.client_id,
+        nom: formData.nom,
+        prenom: formData.prenom,
+        telephone: formData.telephone,
+        adresse: formData.adresse,
+        produit_achete: productData,
+        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
+        date_achat: formData.date_achat || null,
+        statut_client: formData.statut_client || null,
+        commentaire: formData.commentaire,
+        user_id: user.id
+      }
+
+      console.log("[v0] Inserting customer:", insertData)
+
+      const { data, error } = await supabase
+        .from("customers")
+        .insert([insertData])
+        .select()
+        .single()
+
+      if (error) {
+        console.log("[v0] Error adding customer:", error)
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("[v0] Customer added successfully:", data)
+      setCustomers([data, ...customers])
+      setIsAddDialogOpen(false)
+      resetForm()
+      router.refresh()
+    } catch (err) {
+      console.log("[v0] Exception:", err)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setCustomers([data, ...customers])
-    setIsAddDialogOpen(false)
-    resetForm()
-    router.refresh()
   }
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting || !editingCustomer) return
 
-    if (!editingCustomer) return
+    setIsSubmitting(true)
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    const { data, error } = await supabase
-      .from("customers")
-      .update(formData)
-      .eq("id", editingCustomer.id)
-      .select()
-      .single()
+      // Filter out empty products and prepare data
+      const validProducts = formData.products.filter(p => p.name.trim())
+      const productData = validProducts.length > 0 ? JSON.stringify(validProducts) : null
 
-    if (error) {
-      console.error("Error updating customer:", error)
-      return
+      const updateData = {
+        client_id: formData.client_id,
+        nom: formData.nom,
+        prenom: formData.prenom,
+        telephone: formData.telephone,
+        adresse: formData.adresse,
+        produit_achete: productData,
+        quantite: validProducts.length > 0 ? validProducts[0].quantity : 1,
+        date_achat: formData.date_achat || null,
+        statut_client: formData.statut_client || null,
+        commentaire: formData.commentaire,
+      }
+
+      console.log("[v0] Updating customer:", updateData)
+
+      const { data, error } = await supabase
+        .from("customers")
+        .update(updateData)
+        .eq("id", editingCustomer.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.log("[v0] Error updating customer:", error)
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("[v0] Customer updated successfully:", data)
+      setCustomers(customers.map((c) => (c.id === data.id ? data : c)))
+      setEditingCustomer(null)
+      resetForm()
+      router.refresh()
+    } catch (err) {
+      console.log("[v0] Exception:", err)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setCustomers(customers.map((c) => (c.id === data.id ? data : c)))
-    setEditingCustomer(null)
-    resetForm()
-    router.refresh()
   }
 
   const handleDeleteCustomer = async (id: string) => {
@@ -454,7 +527,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
     const { error } = await supabase.from("customers").delete().eq("id", id)
 
     if (error) {
-      console.error("Error deleting customer:", error)
+      console.log("[v0] Error deleting customer:", error)
       return
     }
 
@@ -470,12 +543,16 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       prenom: customer.prenom || "",
       telephone: customer.telephone || "",
       adresse: customer.adresse || "",
-      produit_achete: customer.produit_achete || "",
-      quantite: customer.quantite || 1,
+      products: parseProducts(customer),
       date_achat: customer.date_achat || "",
       statut_client: customer.statut_client || "",
       commentaire: customer.commentaire || "",
     })
+  }
+
+  const openAddDialog = () => {
+    resetForm()
+    setIsAddDialogOpen(true)
   }
 
   return (
@@ -492,7 +569,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => resetForm()} className="w-full sm:w-auto">
+            <Button onClick={openAddDialog} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Ajouter un client
             </Button>
@@ -503,16 +580,79 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
               <DialogDescription>Remplissez les informations du client</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCustomer} className="space-y-4">
-              <FormFields
-                formData={formData}
-                setFormData={setFormData}
-                handleInputChange={handleInputChange}
-                handleSelectChange={handleSelectChange}
-                handleProductChange={handleProductChange}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="client_id">ID Client (modifiable)</Label>
+                  <Input
+                    id="client_id"
+                    name="client_id"
+                    value={formData.client_id}
+                    onChange={handleInputChange}
+                    placeholder="CLT-001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nom">Nom</Label>
+                  <Input id="nom" name="nom" value={formData.nom} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prenom">Prénom</Label>
+                  <Input id="prenom" name="prenom" value={formData.prenom} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telephone">Téléphone</Label>
+                  <Input id="telephone" name="telephone" value={formData.telephone} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date_achat">Date d'achat</Label>
+                  <Input
+                    id="date_achat"
+                    name="date_achat"
+                    type="date"
+                    value={formData.date_achat}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="statut_client">Statut du client</Label>
+                  <Select
+                    value={formData.statut_client}
+                    onValueChange={(value) => handleSelectChange("statut_client", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="adresse">Adresse</Label>
+                  <Input id="adresse" name="adresse" value={formData.adresse} onChange={handleInputChange} />
+                </div>
+              </div>
+              <ProductsList
+                products={formData.products}
+                onProductsChange={handleProductsChange}
                 existingProducts={existingProducts}
               />
-              <Button type="submit" className="w-full">
-                Ajouter
+              <div className="space-y-2">
+                <Label htmlFor="commentaire">Commentaire</Label>
+                <Textarea
+                  id="commentaire"
+                  name="commentaire"
+                  value={formData.commentaire}
+                  onChange={handleInputChange}
+                  rows={3}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Ajout en cours..." : "Ajouter"}
               </Button>
             </form>
           </DialogContent>
@@ -530,7 +670,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                 <TableHead>Prénom</TableHead>
                 <TableHead>Téléphone</TableHead>
                 <TableHead>Adresse</TableHead>
-                <TableHead>Produit acheté</TableHead>
+                <TableHead>Produits achetés</TableHead>
                 <TableHead>Date d'achat</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Commentaire</TableHead>
@@ -552,10 +692,10 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                     <TableCell>{customer.prenom || "-"}</TableCell>
                     <TableCell>{customer.telephone || "-"}</TableCell>
                     <TableCell>{customer.adresse || "-"}</TableCell>
-                    <TableCell>
-                      {customer.produit_achete
-                        ? `${customer.quantite || 1} x ${customer.produit_achete}`
-                        : "-"}
+                    <TableCell className="max-w-[200px]">
+                      <div className="truncate" title={formatProductsDisplay(customer)}>
+                        {formatProductsDisplay(customer)}
+                      </div>
                     </TableCell>
                     <TableCell>{customer.date_achat || "-"}</TableCell>
                     <TableCell>
@@ -582,17 +722,79 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                               <DialogDescription>Modifiez les informations du client</DialogDescription>
                             </DialogHeader>
                             <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                              <FormFields
-                                isEdit
-                                formData={formData}
-                                setFormData={setFormData}
-                                handleInputChange={handleInputChange}
-                                handleSelectChange={handleSelectChange}
-                                handleProductChange={handleProductChange}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_client_id">ID Client (modifiable)</Label>
+                                  <Input
+                                    id="edit_client_id"
+                                    name="client_id"
+                                    value={formData.client_id}
+                                    onChange={handleInputChange}
+                                    placeholder="CLT-001"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_nom">Nom</Label>
+                                  <Input id="edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_prenom">Prénom</Label>
+                                  <Input id="edit_prenom" name="prenom" value={formData.prenom} onChange={handleInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_telephone">Téléphone</Label>
+                                  <Input id="edit_telephone" name="telephone" value={formData.telephone} onChange={handleInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_date_achat">Date d'achat</Label>
+                                  <Input
+                                    id="edit_date_achat"
+                                    name="date_achat"
+                                    type="date"
+                                    value={formData.date_achat}
+                                    onChange={handleInputChange}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit_statut_client">Statut du client</Label>
+                                  <Select
+                                    value={formData.statut_client}
+                                    onValueChange={(value) => handleSelectChange("statut_client", value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Sélectionner un statut" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {STATUS_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2 sm:col-span-2">
+                                  <Label htmlFor="edit_adresse">Adresse</Label>
+                                  <Input id="edit_adresse" name="adresse" value={formData.adresse} onChange={handleInputChange} />
+                                </div>
+                              </div>
+                              <ProductsList
+                                products={formData.products}
+                                onProductsChange={handleProductsChange}
                                 existingProducts={existingProducts}
                               />
-                              <Button type="submit" className="w-full">
-                                Mettre à jour
+                              <div className="space-y-2">
+                                <Label htmlFor="edit_commentaire">Commentaire</Label>
+                                <Textarea
+                                  id="edit_commentaire"
+                                  name="commentaire"
+                                  value={formData.commentaire}
+                                  onChange={handleInputChange}
+                                  rows={3}
+                                />
+                              </div>
+                              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                                {isSubmitting ? "Mise à jour..." : "Mettre à jour"}
                               </Button>
                             </form>
                           </DialogContent>
@@ -644,17 +846,79 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                           <DialogDescription>Modifiez les informations du client</DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleUpdateCustomer} className="space-y-4">
-                          <FormFields
-                            isEdit
-                            formData={formData}
-                            setFormData={setFormData}
-                            handleInputChange={handleInputChange}
-                            handleSelectChange={handleSelectChange}
-                            handleProductChange={handleProductChange}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_client_id">ID Client (modifiable)</Label>
+                              <Input
+                                id="mobile_edit_client_id"
+                                name="client_id"
+                                value={formData.client_id}
+                                onChange={handleInputChange}
+                                placeholder="CLT-001"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_nom">Nom</Label>
+                              <Input id="mobile_edit_nom" name="nom" value={formData.nom} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_prenom">Prénom</Label>
+                              <Input id="mobile_edit_prenom" name="prenom" value={formData.prenom} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_telephone">Téléphone</Label>
+                              <Input id="mobile_edit_telephone" name="telephone" value={formData.telephone} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_date_achat">Date d'achat</Label>
+                              <Input
+                                id="mobile_edit_date_achat"
+                                name="date_achat"
+                                type="date"
+                                value={formData.date_achat}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="mobile_edit_statut_client">Statut du client</Label>
+                              <Select
+                                value={formData.statut_client}
+                                onValueChange={(value) => handleSelectChange("statut_client", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner un statut" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label htmlFor="mobile_edit_adresse">Adresse</Label>
+                              <Input id="mobile_edit_adresse" name="adresse" value={formData.adresse} onChange={handleInputChange} />
+                            </div>
+                          </div>
+                          <ProductsList
+                            products={formData.products}
+                            onProductsChange={handleProductsChange}
                             existingProducts={existingProducts}
                           />
-                          <Button type="submit" className="w-full">
-                            Mettre à jour
+                          <div className="space-y-2">
+                            <Label htmlFor="mobile_edit_commentaire">Commentaire</Label>
+                            <Textarea
+                              id="mobile_edit_commentaire"
+                              name="commentaire"
+                              value={formData.commentaire}
+                              onChange={handleInputChange}
+                              rows={3}
+                            />
+                          </div>
+                          <Button type="submit" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting ? "Mise à jour..." : "Mettre à jour"}
                           </Button>
                         </form>
                       </DialogContent>
@@ -684,12 +948,8 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <div className="text-xs text-muted-foreground">Produit</div>
-                    <div className="truncate">
-                      {customer.produit_achete
-                        ? `${customer.quantite || 1} x ${customer.produit_achete}`
-                        : "-"}
-                    </div>
+                    <div className="text-xs text-muted-foreground">Produits</div>
+                    <div className="truncate">{formatProductsDisplay(customer)}</div>
                   </div>
                 </div>
                 {customer.adresse && (
